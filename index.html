@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <title>Карта МКД Семей — Панель управления</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Inter', sans-serif; background: #f4f7f9; }
+        #map { height: 100vh; width: 100%; }
+        
+        /* Стильная панель поиска */
+        .ui-panel {
+            position: absolute; top: 20px; left: 20px; z-index: 1000;
+            background: white; padding: 20px; border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15); width: 300px;
+        }
+        h2 { margin: 0 0 15px 0; font-size: 18px; color: #1a202c; }
+        input {
+            width: 100%; padding: 12px; border: 2px solid #e2e8f0;
+            border-radius: 8px; font-size: 14px; outline: none;
+            transition: border-color 0.2s; box-sizing: border-box;
+        }
+        input:focus { border-color: #3182ce; }
+        #status { margin-top: 12px; font-size: 13px; color: #718096; font-weight: 600; }
+        
+        /* Легенда карты */
+        .legend {
+            position: absolute; bottom: 30px; right: 20px; z-index: 1000;
+            background: white; padding: 15px; border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); font-size: 13px;
+        }
+        .legend-item { display: flex; align-items: center; margin-bottom: 5px; }
+        .dot { height: 12px; width: 12px; border-radius: 50%; margin-right: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="ui-panel">
+    <h2>МКД Семей</h2>
+    <input type="text" id="addressSearch" placeholder="Поиск по адресу (напр. Абая)...">
+    <div id="status">Загрузка данных...</div>
+</div>
+
+<div class="legend">
+    <div class="legend-item"><div class="dot" style="background: #28a745"></div> ОСИ</div>
+    <div class="legend-item"><div class="dot" style="background: #007bff"></div> КСК</div>
+    <div class="legend-item"><div class="dot" style="background: #ffc107"></div> ПТ</div>
+    <div class="legend-item"><div class="dot" style="background: #6c757d"></div> Прочее</div>
+</div>
+
+<div id="map"></div>
+
+<script>
+    const map = L.map('map', { zoomControl: false }).setView([50.4111, 80.2275], 13);
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    const markers = [];
+
+    function getColor(type) {
+        if (type.includes('ОСИ')) return '#28a745';
+        if (type.includes('КСК')) return '#007bff';
+        if (type.includes('ПТ')) return '#ffc107';
+        return '#6c757d';
+    }
+
+    fetch('houses.json')
+        .then(res => res.json())
+        .then(data => {
+            data.forEach(h => {
+                if (h.lat && h.lon) {
+                    const m = L.circleMarker([h.lat, h.lon], {
+                        radius: 7, fillColor: getColor(h.type), color: "#fff", weight: 1.5, fillOpacity: 0.8
+                    }).addTo(map).bindPopup(`
+                        <div style="font-family: 'Inter', sans-serif;">
+                            <b style="font-size: 14px;">${h.address}</b><br>
+                            <hr style="border: 0; border-top: 1px solid #eee; margin: 8px 0;">
+                            <span style="color: #666;">Управление:</span> <b>${h.uk}</b><br>
+                            <span style="color: #666;">Форма:</span> ${h.type}<br>
+                            <span style="color: #666;">Квартир:</span> ${h.apartments}
+                        </div>
+                    `);
+                    markers.push({ address: h.address.toLowerCase(), marker: m });
+                }
+            });
+            document.getElementById('status').innerText = `Всего объектов: ${markers.length}`;
+        })
+        .catch(err => document.getElementById('status').innerText = "Ошибка загрузки данных");
+
+    document.getElementById('addressSearch').addEventListener('input', function(e) {
+        const query = e.target.value.toLowerCase();
+        if (query.length < 2) return;
+        const found = markers.find(m => m.address.includes(query));
+        if (found) {
+            map.setView(found.marker.getLatLng(), 17);
+            found.marker.openPopup();
+        }
+    });
+</script>
+</body>
+</html>
